@@ -863,9 +863,9 @@
   </link>
 
   <joint name="base_to_camera" type="fixed">
-    <parent link="base"/>
+    <parent link="ur10_wrist_3_link"/>
     <child link="camera_base"/>
-    <origin rpy="0.0 0.0 1.57075" xyz="0.0 -0.05 -0.06"/>
+    <origin rpy="0 3.1415 4.71225" xyz="0 0.03 0.06"/>
   </joint>
 
   <link name="camera_base">
@@ -880,8 +880,8 @@
       <geometry>
         <box size="0.012 0.048 0.03"/>
       </geometry>
-      <material name="blue">
-        <color rgba="0 0 .8 1"/>
+      <material name="green">
+        <color rgba="0 .8 0 1"/>
       </material>
     </visual>
   </link>
@@ -896,10 +896,18 @@
       <geometry>
         <cylinder length="0.012" radius="0.012"/>
       </geometry>
-      <material name="blue">
-        <color rgba="0 0 .8 1"/>
+      <material name="green">
+        <color rgba="0 .8 0 1"/>
       </material>
     </visual>
+  </link>
+  <joint name="glass_to_view" type="fixed"> 
+    <parent link="glass_link"/>
+    <child link="view_link"/>
+    <origin rpy="4.71225 4.71225 1.57075" xyz="0.0 0.0 0.0"/>
+    <axis xyz="0.0 0.0 0.0"/>
+  </joint>
+  <link name="view_link">
   </link>
 
   <joint name="l_finger_actuator" type="prismatic">
