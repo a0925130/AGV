@@ -92,12 +92,6 @@
         <color rgba="0.0 0.0 .8 1"/>
       </material>
     </visual>
-    <collision>
-      <origin rpy="3.141592653589793 0 0" xyz="0.0 0.0 0.0"/>
-      <geometry>
-        <mesh filename="package://meshes/mir/visual/sick_lms-100.stl"/>
-      </geometry>
-    </collision>
     <inertial>
       <mass value="80.0"/>
       <origin xyz="0 0 0"/>
@@ -158,12 +152,6 @@
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <collision>
-      <origin rpy="3.141592653589793 0 0" xyz="0.0 0.0 0.0"/>
-      <geometry>
-        <mesh filename="package://meshes/mir/visual/sick_lms-100.stl"/>
-      </geometry>
-    </collision>
     <inertial>
       <mass value="80.0"/>
       <origin xyz="0 0 0"/>

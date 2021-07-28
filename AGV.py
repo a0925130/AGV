@@ -1,7 +1,10 @@
+from threading import Thread
 import numpy as np
 import pybullet as p
 import time
 import pybullet_data
+import math
+import matplotlib.pyplot as plt
 
 physicsClient = p.connect(p.GUI)
 p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
@@ -26,13 +29,19 @@ obstacle_5 = p.loadURDF("ur_mir_data/obstacle.urdf", basePosition=obstacleSratPo
 obstacle_6 = p.loadURDF("ur_mir_data/obstacle.urdf", basePosition=obstacleSratPos_6)
 robot = p.loadURDF("ur_mir_data/mir_ur.urdf")
 
+point_x = []
+point_y = []
+numRays = 32
+rayLen = 10
+rayColor = [0, 0, 1]
+
 numJoints = p.getNumJoints(robot)
 for joint in range(numJoints):
     print(p.getJointInfo(robot, joint))
     p.setJointMotorControl(robot, joint, p.POSITION_CONTROL, 0, 100)
 
 
-def setCameraPicAndGetPic(robot_id: int, robot_link: int, width: int = 224, height: int = 224):
+def Camera(robot_id: int, robot_link: int, width: int = 224, height: int = 224):
     # basePos, baseOrientation = p.getBasePositionAndOrientation(robot_id)
     basePos = p.getLinkState(robot_id, robot_link)[0]
     baseOrientation = p.getLinkState(robot_id, robot_link)[1]
@@ -55,12 +64,75 @@ def setCameraPicAndGetPic(robot_id: int, robot_link: int, width: int = 224, heig
         farVal=20,
     )
 
-    width, height, rgbImg, depthImg, segImg = p.getCameraImage(
+    # width, height, rgbImg, depthImg, segImg =
+    p.getCameraImage(
         width=width, height=height,
         viewMatrix=viewMatrix,
         projectionMatrix=projectionMatrix,
     )
-    return width, height, rgbImg, depthImg, segImg
+    # return width, height, rgbImg, depthImg, segImg
+
+
+def Laser(robot_id):
+    results = []
+    rayFrom_front = []
+    rayFrom_back = []
+    rayTo_front = []
+    rayTo_back = []
+    for i in range(numRays):
+        Camera(robot, 28)
+        basePos_front = p.getLinkState(robot_id, 3)[0]
+        ray_front_x = basePos_front[0] + rayLen * math.sin(2. * math.pi * float(i) / numRays)
+        ray_front_y = basePos_front[1] + rayLen * math.cos(2. * math.pi * float(i) / numRays)
+        ray_front_z = basePos_front[2]
+        rayFrom_front.append(basePos_front)
+        rayTo_front.append([ray_front_x, ray_front_y, ray_front_z])
+        p.addUserDebugLine(rayFrom_front[i], rayTo_front[i], rayColor)
+        results.append(p.rayTest(rayFrom_front[i], rayTo_front[i]))
+
+        basePos_back = p.getLinkState(robot_id, 4)[0]
+        ray_back_x = basePos_back[0] + rayLen * math.sin(2. * math.pi * float(i) / numRays)
+        ray_back_y = basePos_back[1] + rayLen * math.cos(2. * math.pi * float(i) / numRays)
+        ray_back_z = basePos_back[2]
+        rayFrom_back.append(basePos_back)
+        rayTo_back.append([ray_back_x, ray_back_y, ray_back_z])
+        p.addUserDebugLine(rayFrom_back[i], rayTo_back[i], rayColor)
+        results.append(p.rayTest(rayFrom_back[i], rayTo_back[i]))
+
+        for j in range(len(results)):
+            if basePos_front[0] > basePos_back[0]:
+                if basePos_front[1] > basePos_back[1]:
+                    if not ((basePos_front[0] > results[j][0][3][0]) & (basePos_back[0] < results[j][0][3][0])) & ((basePos_front[1] > results[j][0][3][1]) & (basePos_back[1] < results[j][0][3][1])):
+                        point_x.append(results[j][0][3][0])
+                        point_y.append(results[j][0][3][1])
+                else:
+                    if not ((basePos_front[0] > results[j][0][3][0]) & (basePos_back[0] < results[j][0][3][0])) & ((basePos_front[1] < results[j][0][3][1]) & (basePos_back[1] > results[j][0][3][1])):
+                        point_x.append(results[j][0][3][0])
+                        point_y.append(results[j][0][3][1])
+            else:
+                if basePos_front[1] > basePos_back[1]:
+                    if not ((basePos_front[0] < results[j][0][3][0]) & (basePos_back[0] > results[j][0][3][0])) & ((basePos_front[1] > results[j][0][3][1]) & (basePos_back[1] < results[j][0][3][1])):
+                        point_x.append(results[j][0][3][0])
+                        point_y.append(results[j][0][3][1])
+                else:
+                    if not ((basePos_front[0] < results[j][0][3][0]) & (basePos_back[0] > results[j][0][3][0])) & ((basePos_front[1] < results[j][0][3][1]) & (basePos_back[1] > results[j][0][3][1])):
+                        point_x.append(results[j][0][3][0])
+                        point_y.append(results[j][0][3][1])
+    p.removeAllUserDebugItems()
+
+
+def map(x, y):
+    plt.scatter(x, y, color='blue', marker='o')
+    plt.ion()
+    plt.show()
+    plt.pause(0.5)
+    plt.clf()
+
+
+def start():
+    Thread(target=map(point_x, point_y))
+    Laser(robot)
+    start()
 
 
 # p.setJointMotorControl2(boxId, 21, p.POSITION_CONTROL, targetVelocity=-30)
@@ -71,6 +143,8 @@ def setCameraPicAndGetPic(robot_id: int, robot_link: int, width: int = 224, heig
 # p.setJointMotorControl2(robot, 23, p.POSITION_CONTROL, targetVelocity=5)
 p.setJointMotorControl2(robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
 p.setJointMotorControl2(robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
+p.setRealTimeSimulation(1)
+
 while 1:
-    setCameraPicAndGetPic(robot, 28)
+    start()
     time.sleep(1. / 240.)
