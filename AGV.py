@@ -7,7 +7,7 @@ import math
 import matplotlib.pyplot as plt
 point_x = []
 point_y = []
-numRays = 16
+numRays = 8
 rayLen = 10
 rayColor = [0, 0, 1]
 
@@ -47,8 +47,8 @@ class mir_with_ur:
         for joint in range(numJoints):
             print(p.getJointInfo(self.robot, joint))
             p.setJointMotorControl(self.robot, joint, p.POSITION_CONTROL, 0, 100)
-        # p.setJointMotorControl2(self.robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
-        # p.setJointMotorControl2(self.robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
+        p.setJointMotorControl2(self.robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
+        p.setJointMotorControl2(self.robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
 
     def Camera(self):
             basePos = p.getLinkState(self, 28)[0]
@@ -80,53 +80,55 @@ class mir_with_ur:
             )
 
     def Laser(self):
-        rayFrom_front = []
-        rayFrom_back = []
-        rayTo_front = []
-        rayTo_back = []
+        rayFrom1 = []
+        rayTo1 = []
+        rayFrom2 = []
+        rayTo2 = []
+        rayFrom3 = []
+        rayTo3 = []
         for i in range(numRays):
-            results = []
-            basePos_front = p.getLinkState(self, 3)[0]
-            ray_front_x = basePos_front[0] + rayLen * math.sin(2. * math.pi * float(i) / numRays)
-            ray_front_y = basePos_front[1] + rayLen * math.cos(2. * math.pi * float(i) / numRays)
-            ray_front_z = basePos_front[2]
-            rayFrom_front.append(basePos_front)
-            rayTo_front.append([ray_front_x, ray_front_y, ray_front_z])
-            p.addUserDebugLine(rayFrom_front[i], rayTo_front[i], rayColor)
-            results.append(p.rayTest(rayFrom_front[i], rayTo_front[i]))
+            results1 = []
+            results2 = []
+            results3 = []
 
-            basePos_back = p.getLinkState(self, 4)[0]
-            ray_back_x = basePos_back[0] + rayLen * math.sin(2. * math.pi * float(i) / numRays)
-            ray_back_y = basePos_back[1] + rayLen * math.cos(2. * math.pi * float(i) / numRays)
-            ray_back_z = basePos_back[2]
-            rayFrom_back.append(basePos_back)
-            rayTo_back.append([ray_back_x, ray_back_y, ray_back_z])
-            p.addUserDebugLine(rayFrom_back[i], rayTo_back[i], rayColor)
-            results.append(p.rayTest(rayFrom_back[i], rayTo_back[i]))
+            basePos = p.getLinkState(self, 3)[0]
+            ray_x1 = basePos[0] + rayLen * math.sin(0.5 * math.pi * float(i) / numRays)
+            ray_y1 = basePos[1] + rayLen * math.cos(0.5 * math.pi * float(i) / numRays)
+            ray_z1 = basePos[2]
+            rayFrom1.append(basePos)
+            rayTo1.append([ray_x1, ray_y1, ray_z1])
+            p.addUserDebugLine(rayFrom1[i], rayTo1[i], rayColor)
+            results1.append(p.rayTest(rayFrom1[i], rayTo1[i]))
 
-            for j in range(len(results)):
-                if basePos_front[0] > basePos_back[0]:
-                    if basePos_front[1] > basePos_back[1]:
-                        if not ((basePos_front[0] > results[j][0][3][0]) & (basePos_back[0] < results[j][0][3][0])) & (
-                                (basePos_front[1] > results[j][0][3][1]) & (basePos_back[1] < results[j][0][3][1])):
-                            point_x.append(results[j][0][3][0])
-                            point_y.append(results[j][0][3][1])
-                    else:
-                        if not ((basePos_front[0] > results[j][0][3][0]) & (basePos_back[0] < results[j][0][3][0])) & (
-                                (basePos_front[1] < results[j][0][3][1]) & (basePos_back[1] > results[j][0][3][1])):
-                            point_x.append(results[j][0][3][0])
-                            point_y.append(results[j][0][3][1])
-                else:
-                    if basePos_front[1] > basePos_back[1]:
-                        if not ((basePos_front[0] < results[j][0][3][0]) & (basePos_back[0] > results[j][0][3][0])) & (
-                                (basePos_front[1] > results[j][0][3][1]) & (basePos_back[1] < results[j][0][3][1])):
-                            point_x.append(results[j][0][3][0])
-                            point_y.append(results[j][0][3][1])
-                    else:
-                        if not ((basePos_front[0] < results[j][0][3][0]) & (basePos_back[0] > results[j][0][3][0])) & (
-                                (basePos_front[1] < results[j][0][3][1]) & (basePos_back[1] > results[j][0][3][1])):
-                            point_x.append(results[j][0][3][0])
-                            point_y.append(results[j][0][3][1])
+            basePos = p.getLinkState(self, 3)[0]
+            ray_x2 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi))
+            ray_y2 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi))
+            ray_z2 = basePos[2]
+            rayFrom2.append(basePos)
+            rayTo2.append([ray_x2, ray_y2, ray_z2])
+            p.addUserDebugLine(rayFrom2[i], rayTo2[i], rayColor)
+            results2.append(p.rayTest(rayFrom2[i], rayTo2[i]))
+
+            basePos = p.getLinkState(self, 3)[0]
+            ray_x3 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi))
+            ray_y3 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi))
+            ray_z3 = basePos[2]
+            rayFrom3.append(basePos)
+            rayTo3.append([ray_x3, ray_y3, ray_z3])
+            p.addUserDebugLine(rayFrom3[i], rayTo3[i], rayColor)
+            results3.append(p.rayTest(rayFrom3[i], rayTo3[i]))
+
+            for j in range(len(results1)):
+                point_x.append(results1[j][0][3][0] - rayFrom1[j][0])
+                point_y.append(results1[j][0][3][1] - rayFrom1[j][1])
+
+            for j in range(len(results2)):
+                point_x.append(results2[j][0][3][0] - rayFrom2[j][0])
+                point_y.append(results2[j][0][3][1] - rayFrom2[j][0])
+
+            for j in range(len(results3)):
+                point_x.append(results3[j][0][3][0] - rayFrom3[j][0])
+                point_y.append(results3[j][0][3][1] - rayFrom3[j][0])
         p.removeAllUserDebugItems()
 
     def run(self):
