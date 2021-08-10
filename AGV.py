@@ -1,10 +1,12 @@
 from threading import Thread
+from multiprocessing import Process
 import numpy as np
 import pybullet as p
 import time
 import pybullet_data
 import math
 import matplotlib.pyplot as plt
+
 point_x = []
 point_y = []
 numRays = 8
@@ -44,42 +46,43 @@ class mir_with_ur:
         self.robot = p.loadURDF("ur_mir_data/mir_ur.urdf")
         p.setRealTimeSimulation(1)
         numJoints = p.getNumJoints(self.robot)
+        self.baseYaw = p.getEulerFromQuaternion(p.getLinkState(self.robot, 3)[1])[2]
         for joint in range(numJoints):
             print(p.getJointInfo(self.robot, joint))
             p.setJointMotorControl(self.robot, joint, p.POSITION_CONTROL, 0, 100)
-        p.setJointMotorControl2(self.robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
-        p.setJointMotorControl2(self.robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
+        # p.setJointMotorControl2(self.robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
+        # p.setJointMotorControl2(self.robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
 
     def Camera(self):
-            basePos = p.getLinkState(self, 28)[0]
-            baseOrientation = p.getLinkState(self, 28)[1]
-            matrix = p.getMatrixFromQuaternion(baseOrientation)
-            tx_vec = np.array([matrix[0], matrix[3], matrix[6]])
-            tz_vec = np.array([matrix[2], matrix[5], matrix[8]])
+        basePos = p.getLinkState(self, 28)[0]
+        baseOrientation = p.getLinkState(self, 28)[1]
+        matrix = p.getMatrixFromQuaternion(baseOrientation)
+        tx_vec = np.array([matrix[0], matrix[3], matrix[6]])
+        tz_vec = np.array([matrix[2], matrix[5], matrix[8]])
 
-            basePos = np.array(basePos)
-            targetPos = basePos + 1 * tx_vec
+        basePos = np.array(basePos)
+        targetPos = basePos + 1 * tx_vec
 
-            viewMatrix = p.computeViewMatrix(
-                cameraEyePosition=basePos,
-                cameraTargetPosition=targetPos,
-                cameraUpVector=tz_vec,
-            )
-            projectionMatrix = p.computeProjectionMatrixFOV(
-                fov=50.0,
-                aspect=1.0,
-                nearVal=0.01,
-                farVal=20,
-            )
+        viewMatrix = p.computeViewMatrix(
+            cameraEyePosition=basePos,
+            cameraTargetPosition=targetPos,
+            cameraUpVector=tz_vec,
+        )
+        projectionMatrix = p.computeProjectionMatrixFOV(
+            fov=50.0,
+            aspect=1.0,
+            nearVal=0.01,
+            farVal=20,
+        )
 
-            p.getCameraImage(
-                width=214, height=214,
-                viewMatrix=viewMatrix,
-                renderer=p.ER_BULLET_HARDWARE_OPENGL,
-                projectionMatrix=projectionMatrix,
-            )
+        p.getCameraImage(
+            width=214, height=214,
+            viewMatrix=viewMatrix,
+            renderer=p.ER_BULLET_HARDWARE_OPENGL,
+            projectionMatrix=projectionMatrix,
+        )
 
-    def Laser(self):
+    def Laser(self, Yaw1):
         rayFrom1 = []
         rayTo1 = []
         rayFrom2 = []
@@ -92,8 +95,10 @@ class mir_with_ur:
             results3 = []
 
             basePos = p.getLinkState(self, 3)[0]
-            ray_x1 = basePos[0] + rayLen * math.sin(0.5 * math.pi * float(i) / numRays)
-            ray_y1 = basePos[1] + rayLen * math.cos(0.5 * math.pi * float(i) / numRays)
+            Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
+
+            ray_x1 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) - Yaw)
+            ray_y1 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) - Yaw)
             ray_z1 = basePos[2]
             rayFrom1.append(basePos)
             rayTo1.append([ray_x1, ray_y1, ray_z1])
@@ -101,8 +106,8 @@ class mir_with_ur:
             results1.append(p.rayTest(rayFrom1[i], rayTo1[i]))
 
             basePos = p.getLinkState(self, 3)[0]
-            ray_x2 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi))
-            ray_y2 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi))
+            ray_x2 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi) - Yaw)
+            ray_y2 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (0.5 * math.pi) - Yaw)
             ray_z2 = basePos[2]
             rayFrom2.append(basePos)
             rayTo2.append([ray_x2, ray_y2, ray_z2])
@@ -110,8 +115,8 @@ class mir_with_ur:
             results2.append(p.rayTest(rayFrom2[i], rayTo2[i]))
 
             basePos = p.getLinkState(self, 3)[0]
-            ray_x3 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi))
-            ray_y3 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi))
+            ray_x3 = basePos[0] + rayLen * math.sin((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi) - Yaw)
+            ray_y3 = basePos[1] + rayLen * math.cos((0.5 * math.pi * float(i) / numRays) + (1.5 * math.pi) - Yaw)
             ray_z3 = basePos[2]
             rayFrom3.append(basePos)
             rayTo3.append([ray_x3, ray_y3, ray_z3])
@@ -132,14 +137,13 @@ class mir_with_ur:
         p.removeAllUserDebugItems()
 
     def run(self):
-
         try:
             while True:
-                do_laser = Thread(target=mir_with_ur.Laser, args=(self.robot,))
+                do_laser = Thread(target=mir_with_ur.Laser, args=(self.robot, self.baseYaw))
                 do_camera = Thread(target=mir_with_ur.Camera, args=(self.robot,))
                 do_laser.start()
                 do_camera.start()
-                mapping(point_x, point_y)
+                # mapping(point_x, point_y)
                 do_laser.join()
                 do_camera.join()
         finally:
