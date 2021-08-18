@@ -1,6 +1,11 @@
+# CODE SNIPPET #
 import numpy as np
 import math
 from copy import deepcopy
+# Fast SLAM covariance
+from ipywidgets import *
+import numpy as np
+import matplotlib.pyplot as plt
 
 Q = np.diag([3.0, np.deg2rad(10.0)]) ** 2
 R = np.diag([1.0, np.deg2rad(20.0)]) ** 2
@@ -41,9 +46,11 @@ def motion_model(x, u):
     B = np.array([[DT * math.cos(x[2, 0]), 0],
                   [DT * math.sin(x[2, 0]), 0],
                   [0.0, DT]])
+
     x = F @ x + B @ u
 
-    x[2, 0] = Particle.pi_2_pi(x[2, 0])
+    x[2, 0] = pi_2_pi(x[2, 0])
+
     return x
 
 
@@ -54,7 +61,7 @@ def predict_particles(particles, u):
         px[1, 0] = particles[i].y
         px[2, 0] = particles[i].yaw
         ud = u + (np.random.randn(1, 2) @ R).T  # add noise
-        px = Particle.motion_model(px, ud)
+        px = motion_model(px, ud)
         particles[i].x = px[0, 0]
         particles[i].y = px[1, 0]
         particles[i].yaw = px[2, 0]
@@ -64,19 +71,6 @@ def predict_particles(particles, u):
 
 def pi_2_pi(angle):
     return (angle + math.pi) % (2 * math.pi) - math.pi
-
-
-N_LM = 0
-particles = [Particle(N_LM) for i in range(N_PARTICLE)]
-time = 0.0
-v = 1.0  # [m/s]
-yawrate = 0.1  # [rad/s]
-u = np.array([v, yawrate]).reshape(2, 1)
-history = []
-while SIM_TIME >= time:
-    time += DT
-    particles = Particle.predict_particles(particles, u)
-    history.append(deepcopy(particles))
 
 
 def observation(xTrue, xd, u, RFID):
@@ -249,6 +243,7 @@ def resampling(particles):
     pw = np.array(pw)
 
     Neff = 1.0 / (pw @ pw.T)  # Effective particle number
+    # print(Neff)
 
     if Neff < NTH:  # resampling
         wcum = np.cumsum(pw)
@@ -258,7 +253,7 @@ def resampling(particles):
         inds = []
         ind = 0
         for ip in range(N_PARTICLE):
-            while (ind < wcum.shape[0] - 1) and (resampleid[ip] > wcum[ind]):
+            while ((ind < wcum.shape[0] - 1) and (resampleid[ip] > wcum[ind])):
                 ind += 1
             inds.append(ind)
 
@@ -271,3 +266,18 @@ def resampling(particles):
 
     return particles, inds
 
+
+def gaussian(x, mu, sig):
+    return np.exp(-np.power(x - mu, 2.) / (2 * np.power(sig, 2.)))
+
+
+def mapping(v, yawrate, RFID):  # v [m/s] ; yawrate [rad/s] ; RFID landmark
+    u = np.array([v, yawrate]).reshape(2, 1)
+    N_LM = RFID.shape[0]
+    particles = [Particle(N_LM) for i in range(N_PARTICLE)]
+    xTrue = np.zeros((STATE_SIZE, 1))
+    xDR = np.zeros((STATE_SIZE, 1))
+
+    xTrue, z, xd, ud = observation(xTrue, xDR, u, RFID)
+
+    return xd
