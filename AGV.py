@@ -1,12 +1,11 @@
 from threading import Thread
-from multiprocessing import Process
 import numpy as np
 import pybullet as p
 import time
 import pybullet_data
 import math
 import matplotlib.pyplot as plt
-import Slam_fuction
+import Slam_function
 
 point_x = []
 point_y = []
@@ -14,9 +13,7 @@ point_z = []
 numRays = 8
 rayLen = 10
 rayColor = [0, 0, 1]
-t1 = 0
-t2 = 0
-t3 = 0
+
 t1_pre = np.zeros(numRays)
 t2_pre = np.zeros(numRays)
 t3_pre = np.zeros(numRays)
@@ -32,51 +29,61 @@ theta3_pre = np.zeros(numRays)
 theta1_after = np.zeros(numRays)
 theta2_after = np.zeros(numRays)
 theta3_after = np.zeros(numRays)
-yaw1_rate = 0
-yaw2_rate = 0
-yaw3_rate = 0
-v1 = 0
-v2 = 0
-v3 = 0
-s1 = 0
-s2 = 0
-s3 = 0
-pos1 = 0
-pos2 = 0
-pos3 = 0
 s1_pre = np.zeros((numRays, 3))
 s2_pre = np.zeros((numRays, 3))
 s3_pre = np.zeros((numRays, 3))
 s1_after = np.zeros((numRays, 3))
 s2_after = np.zeros((numRays, 3))
 s3_after = np.zeros((numRays, 3))
-rfid = []
-u = []
+RFID = []
 n_landmark = 0
 
-def mapping(RFID, particles, hxTrue, hxDR, hxEst, xEst):
-    plt.cla()
-    # for stopping simulation with the esc key.
-    plt.gcf().canvas.mpl_connect(
-        'key_release_event', lambda event:
-        [exit(0) if event.key == 'escape' else None])
-    plt.plot(RFID[:, 0], RFID[:, 1], "*k")
 
-    for i in range(Slam_fuction.N_PARTICLE):
-        plt.plot(particles[i].x, particles[i].y, ".r")
-        plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
+# def mapping(RFID, particles, hxTrue, hxDR, hxEst, xEst):
+#     plt.cla()
+# plt.gcf().canvas.mpl_connect(
+#     'key_release_event', lambda event:
+#     [exit(0) if event.key == 'escape' else None])
+# plt.plot(RFID[:, 0], RFID[:, 1], "*k")
 
-    plt.plot(hxTrue[0, :], hxTrue[1, :], "-b")
-    plt.plot(hxDR[0, :], hxDR[1, :], "-k")
-    plt.plot(hxEst[0, :], hxEst[1, :], "-r")
-    plt.plot(xEst[0], xEst[1], "xk")
-    plt.axis("equal")
-    plt.grid(True)
-    plt.pause(0.001)
+# for i in range(Slam_fuction.N_PARTICLE):
+#     plt.plot(particles[i].x, particles[i].y, ".r")
+#     plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
+
+# plt.plot(hxTrue[0, :], hxTrue[1, :], "-b")
+# plt.plot(hxDR[0, :], hxDR[1, :], "-k")
+# plt.plot(hxEst[0, :], hxEst[1, :], "-r")
+# plt.plot(xEst[0], xEst[1], "xk")
+# plt.axis("equal")
+# plt.grid(True)
+# plt.pause(0.001)
 
 
 class mir_with_ur:
     def __init__(self):
+        self.RFID = np.array([[10.0, -2.0],
+                              [15.0, 10.0],
+                              [15.0, 15.0],
+                              [10.0, 20.0],
+                              [3.0, 15.0],
+                              [-5.0, 20.0],
+                              [-5.0, 5.0],
+                              [-10.0, 15.0]
+                              ])
+        self.n_landmark = self.RFID.shape[0]
+        self.particles = [Slam_function.Particle(n_landmark) for _ in range(Slam_function.N_PARTICLE)]
+        # self.uv = np.zeros((2, 1))
+        # self.uv = []
+        self.xEst = np.zeros((Slam_function.STATE_SIZE, 1))
+        self.xDR = np.zeros((Slam_function.STATE_SIZE, 1))  # Dead reckoning
+        self.z = np.zeros((3, 3))
+        self.ud = np.zeros((2, 1))
+        self.x_state = np.zeros((3, 1))
+        self.hxEst = self.xEst
+        self.xTrue = np.zeros((Slam_function.STATE_SIZE, 1))
+        self.hxTrue = self.xTrue
+        self.hxDR = self.xTrue
+        self.rfid = np.zeros((3, 1))
         physicsClient = p.connect(p.GUI)
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -97,7 +104,6 @@ class mir_with_ur:
         self.obstacle_5 = p.loadURDF("ur_mir_data/obstacle.urdf", basePosition=self.obstacleSratPos_5)
         self.obstacle_6 = p.loadURDF("ur_mir_data/obstacle.urdf", basePosition=self.obstacleSratPos_6)
         self.robot = p.loadURDF("ur_mir_data/mir_ur.urdf")
-        self.z = 0
         p.setRealTimeSimulation(1)
         numJoints = p.getNumJoints(self.robot)
         self.baseYaw = p.getEulerFromQuaternion(p.getLinkState(self.robot, 3)[1])[2]
@@ -136,6 +142,7 @@ class mir_with_ur:
             renderer=p.ER_BULLET_HARDWARE_OPENGL,
             projectionMatrix=projectionMatrix,
         )
+        time.sleep(0.05)
 
     def Laser(self, Yaw1):
         rayFrom1 = []
@@ -148,9 +155,9 @@ class mir_with_ur:
         yaw_2 = np.zeros(numRays)
         yaw_3 = np.zeros(numRays)
         for i in range(numRays):
-            results1 = []
-            results2 = []
-            results3 = []
+            # results1 = []
+            # results2 = []
+            # results3 = []
             basePos = p.getLinkState(self, 3)[0]
             Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
             yaw_1[i] = Yaw
@@ -174,9 +181,23 @@ class mir_with_ur:
             yaw1_rate = theta1 / t1
             p.addUserDebugLine(rayFrom1[i], rayTo1[i], rayColor)
             results1 = p.rayTest(rayFrom1[i], rayTo1[i])
-            point_x.append(float(results1[0][3][0]) - rayFrom1[i][0])
-            point_y.append(float(results1[0][3][1]) - rayFrom1[i][1])
-            u.append(np.array([v1, yaw1_rate]).reshape(2, 1))
+            point_x = results1[0][3][0] - rayFrom1[i][0]
+            point_y = results1[0][3][1] - rayFrom1[i][1]
+            point_z = results1[0][3][2] - rayFrom1[i][2]
+            # self.rfid = np.concatenate((point_x, point_y,point_z))
+            # RFID.append(np.hstack((point_x, point_y)))
+            # self.uv = Slam_fuction.calc_input1(s1, theta1, t1)
+            uv = np.array([v1, yaw1_rate])
+            # u.append(np.array([v1, yaw1_rate]).reshape(2, 1))
+            self.xTrue, self.z, self.xDR, self.ud = Slam_function.observation(self.xTrue, self.xDR, uv,
+                                                                              self.RFID)
+            # self.particles = Slam_function.fast_slam2(self.particles, self.ud, self.z)
+            # self.xEst = Slam_function.calc_final_state(self.particles)
+            # self.x_state = self.xEst[0:Slam_function.STATE_SIZE]
+
+            # self.hxEst = np.hstack((self.hxEst, self.x_state))
+            # self.hxDR = np.hstack((self.hxDR, self.xDR))
+            # self.hxTrue = np.hstack((self.hxTrue, xTrue))
 
             basePos = p.getLinkState(self, 3)[0]
             Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
@@ -201,9 +222,10 @@ class mir_with_ur:
             yaw2_rate = theta2 / t2
             p.addUserDebugLine(rayFrom2[i], rayTo2[i], rayColor)
             results2 = p.rayTest(rayFrom2[i], rayTo2[i])
-            point_x.append(float(results2[0][3][0]) - rayFrom2[i][0])
-            point_y.append(float(results2[0][3][1]) - rayFrom2[i][1])
-            u.append(np.array([v2, yaw2_rate]).reshape(2, 1))
+            # point_x = results2[0][3][0] - rayFrom2[i][0]
+            # point_y = results2[0][3][1] - rayFrom2[i][1]
+            # RFID.append(np.hstack((point_x, point_y)))
+            # u.append(np.array([v2, yaw2_rate]).reshape(2, 1))
 
             basePos = p.getLinkState(self, 3)[0]
             Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
@@ -228,39 +250,48 @@ class mir_with_ur:
             yaw3_rate = theta3 / t3
             p.addUserDebugLine(rayFrom3[i], rayTo3[i], rayColor)
             results3 = p.rayTest(rayFrom3[i], rayTo3[i])
-            point_x.append(float(results3[0][3][0]) - rayFrom3[i][0])
-            point_y.append(float(results3[0][3][1]) - rayFrom3[i][1])
+            # point_x = results3[0][3][0] - rayFrom3[i][0]
+            # point_y = results3[0][3][1] - rayFrom3[i][1]
+            # RFID.append(np.hstack((point_x, point_y)))
+            # u.append(np.array([v3, yaw3_rate]).reshape(2, 1))
 
-            rfid.append(np.array([point_x, point_y]))
-            u.append(np.array([v3, yaw3_rate]).reshape(2, 1))
-
-            print("u : ", u)
         p.removeAllUserDebugItems()
 
     def run(self):
-        xEst = np.zeros((Slam_fuction.STATE_SIZE, 1))
-        xTrue = np.zeros((Slam_fuction.STATE_SIZE, 1))
-        xDR = np.zeros((Slam_fuction.STATE_SIZE, 1))
-        hxEst = xEst
-        hxTrue = xTrue
-        hxDR = xTrue
-        n_landmark = np.array(rfid).shape[0]
-        particles = [Slam_fuction.Particle(n_landmark) for _ in range(Slam_fuction.N_PARTICLE)]
         try:
             while True:
                 do_laser = Thread(target=mir_with_ur.Laser, args=(self.robot, self.baseYaw))
                 do_camera = Thread(target=mir_with_ur.Camera, args=(self.robot,))
                 do_laser.start()
                 do_camera.start()
+                # length = min(len(point_x), len(point_y))
+                # point_x[:length]
+                # point_y[:length]
 
-                # xTrue, z, xDR, ud = Slam_fuction.observation(xTrue, xDR, u, rfid)
-                # particles = Slam_fuction.fast_slam1(particles, ud, z)
-                # xEst = Slam_fuction.calc_final_state(particles)
-                # x_state = xEst[0: Slam_fuction.STATE_SIZE]
-                # hxEst = np.hstack((hxEst, x_state))
-                # hxDR = np.hstack((hxDR, xDR))
-                # hxTrue = np.hstack((hxTrue, xTrue))
+                if Slam_function.show_animation:  # pragma: no cover
+                    plt.cla()
+                    # for stopping simulation with the esc key.
+                    plt.gcf().canvas.mpl_connect(
+                        'key_release_event',
+                        lambda event: [exit(0) if event.key == 'escape' else None])
+                    plt.plot(self.RFID[:, 0], self.RFID[:, 1], "*k")
 
+                    for iz in range(len(self.z[:, 0])):
+                        landmark_id = int(self.z[2, iz])
+                        plt.plot([self.xEst[0], self.RFID[landmark_id, 0]], [
+                            self.xEst[1], self.RFID[landmark_id, 1]], "-k")
+
+                    for i in range(Slam_function.N_PARTICLE):
+                        plt.plot(self.particles[i].x, self.particles[i].y, ".r")
+                        plt.plot(self.particles[i].lm[:, 0], self.particles[i].lm[:, 1], "xb")
+
+                    plt.plot(self.hxTrue[0, :], self.hxTrue[1, :], "-b")
+                    plt.plot(self.hxDR[0, :], self.hxDR[1, :], "-k")
+                    plt.plot(self.hxEst[0, :], self.hxEst[1, :], "-r")
+                    plt.plot(self.xEst[0], self.xEst[1], "xk")
+                    plt.axis("equal")
+                    plt.grid(True)
+                    plt.pause(0.001)
                 do_laser.join()
                 do_camera.join()
         finally:
