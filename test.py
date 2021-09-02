@@ -31,7 +31,7 @@ STATE_SIZE = 3  # State size [x,y,yaw]
 LM_SIZE = 2  # LM state size [x,y]
 N_PARTICLE = 100  # number of particle
 NTH = N_PARTICLE / 1.5  # Number of particle for re-sampling
-
+rfid = []
 show_animation = True
 numRays = 8
 rayLen = 10
@@ -45,6 +45,7 @@ t3_after = np.zeros(numRays)
 theta1 = 0
 theta2 = 0
 theta3 = 0
+rfid1 = []
 theta1_pre = np.zeros(numRays)
 theta2_pre = np.zeros(numRays)
 theta3_pre = np.zeros(numRays)
@@ -84,7 +85,8 @@ for joint in range(numJoints):
     print(p.getJointInfo(robot, joint))
     p.setJointMotorControl(robot, joint, p.POSITION_CONTROL, 0, 100)
 
-
+p.setJointMotorControl2(robot, 8, p.VELOCITY_CONTROL, targetVelocity=-15)
+p.setJointMotorControl2(robot, 7, p.VELOCITY_CONTROL, targetVelocity=-15)
 class Particle:
 
     def __init__(self, N_LM):
@@ -339,9 +341,10 @@ def resampling(particles):
 
 
 def calc_input1(s1, s2, yaw1, yaw2, t1, t2):
-    v = (math.sqrt(((s2[0] - s1[0]) ** 2) + (s2[1] - s1[1]) ** 2)) / (t2 - t1)
-    yaw_rate = (yaw2 - yaw1) / (t2 - t1)
-    u = np.array([v, yaw_rate]).reshape(2, 1)
+    if t2 - t1 != 0:
+        v = (math.sqrt(((s2[0] - s1[0]) ** 2) + (s2[1] - s1[1]) ** 2)) / (t2 - t1)
+        yaw_rate = (yaw2 - yaw1) / (t2 - t1)
+        u = np.array([v, yaw_rate]).reshape(2, 1)
 
     return u
 
@@ -420,7 +423,6 @@ def Laser():
     yaw_3 = np.zeros(numRays)
     yaw1 = 0.
     yaw2 = 0.
-    rfid = []
     sd1 = np.zeros(2)
     sd2 = np.zeros(2)
     td1 = 0.
@@ -438,7 +440,7 @@ def Laser():
         rayFrom1.append(basePos)
         rayTo1.append([ray_x1, ray_y1, ray_z1])
         yaw1 = Yaw
-        sd1 = np.array([ray_x1, ray_y1])
+        sd1 = np.array([basePos[0], basePos[1]])
         # theta1_pre[i] = theta1_after[i]
         # theta1_after[i] = yaw_1[i]
         # theta1 = theta1_after[i] - theta1_pre[i]
@@ -497,7 +499,7 @@ def Laser():
         rayFrom3.append(basePos)
         rayTo3.append([ray_x3, ray_y3, ray_z3])
         yaw2 = Yaw
-        sd1 = np.array([ray_x1, ray_y1])
+        sd2 = np.array([basePos[0], basePos[1]])
         # theta3_pre[i] = theta3_after[i]
         # theta3_after[i] = yaw_3[i]
         # theta3 = theta3_after[i] - theta3_pre[i]
@@ -520,9 +522,9 @@ def Laser():
         # point_y.append(results3[0][3][1] - rayFrom3[i][1])
         td2 = time.time()
     # rfid = np.concatenate([point_x, point_y])
-    u = calc_input1(sd1, sd2, yaw1, yaw2, 0, 1)
-
-    return np.array(rfid), u
+    u = calc_input1(sd1, sd2, yaw1, yaw2, td1, td2)
+    p.removeAllUserDebugItems()
+    return rfid, u
 
 
 def pi_2_pi(angle):
@@ -532,49 +534,40 @@ def pi_2_pi(angle):
 def main():
     print(__file__ + " start!!")
 
-    time = 0.0
-    # RFID positions [x, y]
-    # RFID = np.array([[10.0, -2.0],
-    #                  [15.0, 10.0],
-    #                  [15.0, 15.0],
-    #                  [10.0, 20.0],
-    #                  [3.0, 15.0],
-    #                  [-5.0, 20.0],
-    #                  [-5.0, 5.0],
-    #                  [-10.0, 15.0]
-    #                  ])
-    RFID, _ = np.array(Laser())
-    print("RFID = ", RFID)
-    n_landmark = RFID.shape[0]
-
+    RFID, u1 = np.array(Laser())
+    # rfid1.append(RFID)
+    n_landmark = np.array(RFID).shape[0]
+    particles = [Particle(n_landmark) for _ in range(N_PARTICLE)]
     # State Vector [x y yaw v]'
     xEst = np.zeros((STATE_SIZE, 1))  # SLAM estimation
     xTrue = np.zeros((STATE_SIZE, 1))  # True state
     xDR = np.zeros((STATE_SIZE, 1))  # Dead reckoning
 
-    # history
     hxEst = xEst
     hxTrue = xTrue
     hxDR = xTrue
+    hxDR = np.hstack((hxDR, xDR))
 
-    particles = [Particle(n_landmark) for _ in range(N_PARTICLE)]
+    x_state = xEst[0: STATE_SIZE]
+    hxEst = np.hstack((hxEst, x_state))
+    hxTrue = np.hstack((hxTrue, xTrue))
 
-    while SIM_TIME >= time:
-        # RFID, u = np.array(Laser())
-        time += DT
-        u = calc_input(time)
-        xTrue, z, xDR, ud = observation(xTrue, xDR, u, RFID)
+    while 1:
 
-        particles = fast_slam2(particles, ud, z)
+        RFID, u1 = np.array(Laser())
+        u1[0] = u1[0] * 10
+        print(u1)
+        if (u1.any != 0):
+            xTrue, z, xDR, ud = observation(xTrue, xDR, u1, np.array(RFID))
+            particles = fast_slam2(particles, ud, z)
+            print("particles", particles[0].x)
+            xEst = calc_final_state(particles)
 
-        xEst = calc_final_state(particles)
+            x_state = xEst[0: STATE_SIZE]
 
-        x_state = xEst[0: STATE_SIZE]
-
-        # store data history
-        hxEst = np.hstack((hxEst, x_state))
-        hxDR = np.hstack((hxDR, xDR))
-        hxTrue = np.hstack((hxTrue, xTrue))
+            hxEst = np.hstack((hxEst, x_state))
+            hxDR = np.hstack((hxDR, xDR))
+            hxTrue = np.hstack((hxTrue, xTrue))
 
         if show_animation:  # pragma: no cover
             plt.cla()
@@ -582,20 +575,15 @@ def main():
             plt.gcf().canvas.mpl_connect(
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
-            plt.plot(RFID[:, 0], RFID[:, 1], "*k")
-
-            for iz in range(len(z[:, 0])):
-                landmark_id = int(z[2, iz])
-                plt.plot([xEst[0], RFID[landmark_id, 0]], [
-                    xEst[1], RFID[landmark_id, 1]], "-k")
+            plt.plot(np.array(RFID)[:, 0], np.array(RFID)[:, 1], "*k")
 
             for i in range(N_PARTICLE):
                 plt.plot(particles[i].x, particles[i].y, ".r")
-                plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
+                # plt.plot(particles[i].lm[:, 0], particles[i].lm[:, 1], "xb")
 
             plt.plot(hxTrue[0, :], hxTrue[1, :], "-b")
             plt.plot(hxDR[0, :], hxDR[1, :], "-k")
-            plt.plot(hxEst[0, :], hxEst[1, :], "-r")
+            # plt.plot(hxEst[0, :], hxEst[1, :], "-r")
             plt.plot(xEst[0], xEst[1], "xk")
             plt.axis("equal")
             plt.grid(True)

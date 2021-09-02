@@ -61,15 +61,6 @@ n_landmark = 0
 
 class mir_with_ur:
     def __init__(self):
-        self.RFID = np.array([[10.0, -2.0],
-                              [15.0, 10.0],
-                              [15.0, 15.0],
-                              [10.0, 20.0],
-                              [3.0, 15.0],
-                              [-5.0, 20.0],
-                              [-5.0, 5.0],
-                              [-10.0, 15.0]
-                              ])
         self.n_landmark = self.RFID.shape[0]
         self.particles = [Slam_function.Particle(n_landmark) for _ in range(Slam_function.N_PARTICLE)]
         # self.uv = np.zeros((2, 1))
@@ -83,7 +74,6 @@ class mir_with_ur:
         self.xTrue = np.zeros((Slam_function.STATE_SIZE, 1))
         self.hxTrue = self.xTrue
         self.hxDR = self.xTrue
-        self.rfid = np.zeros((3, 1))
         physicsClient = p.connect(p.GUI)
         p.configureDebugVisualizer(p.COV_ENABLE_GUI, 1)
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
@@ -154,10 +144,12 @@ class mir_with_ur:
         yaw_1 = np.zeros(numRays)
         yaw_2 = np.zeros(numRays)
         yaw_3 = np.zeros(numRays)
+        rfid = []
         for i in range(numRays):
             # results1 = []
             # results2 = []
             # results3 = []
+            td1 = time.time()
             basePos = p.getLinkState(self, 3)[0]
             Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
             yaw_1[i] = Yaw
@@ -166,38 +158,27 @@ class mir_with_ur:
             ray_z1 = basePos[2]
             rayFrom1.append(basePos)
             rayTo1.append([ray_x1, ray_y1, ray_z1])
-            theta1_pre[i] = theta1_after[i]
-            theta1_after[i] = yaw_1[i]
-            theta1 = theta1_after[i] - theta1_pre[i]
-            for j in range(3):
-                s1_pre[i][j] = s1_after[i][j]
-                s1_after[i][j] = rayFrom1[i][j]
-            pos1 = s1_after[i] - s1_pre[i]
-            s1 = math.sqrt((pos1[0] ** 2) + (pos1[1] ** 2))
-            t1_pre[i] = t1_after[i]
-            t1_after[i] = time.time()
-            t1 = t1_after[i] - t1_pre[i]
-            v1 = s1 / t1
-            yaw1_rate = theta1 / t1
+            # theta1_pre[i] = theta1_after[i]
+            # theta1_after[i] = yaw_1[i]
+            # theta1 = theta1_after[i] - theta1_pre[i]
+            # for j in range(3):
+            #     s1_pre[i][j] = s1_after[i][j]
+            #     s1_after[i][j] = rayFrom1[i][j]
+            # pos1 = s1_after[i] - s1_pre[i]
+            # s1 = math.sqrt((pos1[0] ** 2) + (pos1[1] ** 2))
+            # t1_pre[i] = t1_after[i]
+            # t1_after[i] = time.time()
+            # t1 = t1_after[i] - t1_pre[i]
+            # v1 = s1 / t1
+            # yaw1_rate = theta1 / t1
             p.addUserDebugLine(rayFrom1[i], rayTo1[i], rayColor)
             results1 = p.rayTest(rayFrom1[i], rayTo1[i])
             point_x = results1[0][3][0] - rayFrom1[i][0]
             point_y = results1[0][3][1] - rayFrom1[i][1]
             point_z = results1[0][3][2] - rayFrom1[i][2]
-            # self.rfid = np.concatenate((point_x, point_y,point_z))
-            # RFID.append(np.hstack((point_x, point_y)))
-            # self.uv = Slam_fuction.calc_input1(s1, theta1, t1)
-            uv = np.array([v1, yaw1_rate])
-            # u.append(np.array([v1, yaw1_rate]).reshape(2, 1))
-            self.xTrue, self.z, self.xDR, self.ud = Slam_function.observation(self.xTrue, self.xDR, uv,
-                                                                              self.RFID)
-            # self.particles = Slam_function.fast_slam2(self.particles, self.ud, self.z)
-            # self.xEst = Slam_function.calc_final_state(self.particles)
-            # self.x_state = self.xEst[0:Slam_function.STATE_SIZE]
-
-            # self.hxEst = np.hstack((self.hxEst, self.x_state))
-            # self.hxDR = np.hstack((self.hxDR, self.xDR))
-            # self.hxTrue = np.hstack((self.hxTrue, xTrue))
+            yaw1 = Yaw
+            sd1 = np.array([ray_x1, ray_y1])
+            rfid.append(point_x, point_y)
 
             basePos = p.getLinkState(self, 3)[0]
             Yaw = p.getEulerFromQuaternion(p.getLinkState(self, 3)[1])[2] - Yaw1
@@ -207,23 +188,25 @@ class mir_with_ur:
             ray_z2 = basePos[2]
             rayFrom2.append(basePos)
             rayTo2.append([ray_x2, ray_y2, ray_z2])
-            theta2_pre[i] = theta2_after[i]
-            theta2_after[i] = yaw_2[i]
-            theta2 = theta2_after[i] - theta2_pre[i]
-            for j in range(3):
-                s2_pre[i][j] = s2_after[i][j]
-                s2_after[i][j] = rayFrom2[i][j]
-            pos2 = s2_after[i] - s2_pre[i]
-            s2 = math.sqrt((pos2[0] ** 2) + (pos2[1] ** 2))
-            t2_pre[i] = t2_after[i]
-            t2_after[i] = time.time()
-            t2 = t2_after[i] - t2_pre[i]
-            v2 = s2 / t2
-            yaw2_rate = theta2 / t2
+            # theta2_pre[i] = theta2_after[i]
+            # theta2_after[i] = yaw_2[i]
+            # theta2 = theta2_after[i] - theta2_pre[i]
+            # for j in range(3):
+            #     s2_pre[i][j] = s2_after[i][j]
+            #     s2_after[i][j] = rayFrom2[i][j]
+            # pos2 = s2_after[i] - s2_pre[i]
+            # s2 = math.sqrt((pos2[0] ** 2) + (pos2[1] ** 2))
+            # t2_pre[i] = t2_after[i]
+            # t2_after[i] = time.time()
+            # t2 = t2_after[i] - t2_pre[i]
+            # v2 = s2 / t2
+            # yaw2_rate = theta2 / t2
             p.addUserDebugLine(rayFrom2[i], rayTo2[i], rayColor)
             results2 = p.rayTest(rayFrom2[i], rayTo2[i])
-            # point_x = results2[0][3][0] - rayFrom2[i][0]
-            # point_y = results2[0][3][1] - rayFrom2[i][1]
+            point_x = results2[0][3][0] - rayFrom2[i][0]
+            point_y = results2[0][3][1] - rayFrom2[i][1]
+            point_z = results2[0][3][2] - rayFrom2[i][2]
+            rfid.append(point_x, point_y)
             # RFID.append(np.hstack((point_x, point_y)))
             # u.append(np.array([v2, yaw2_rate]).reshape(2, 1))
 
@@ -235,27 +218,33 @@ class mir_with_ur:
             ray_z3 = basePos[2]
             rayFrom3.append(basePos)
             rayTo3.append([ray_x3, ray_y3, ray_z3])
-            theta3_pre[i] = theta3_after[i]
-            theta3_after[i] = yaw_3[i]
-            theta3 = theta3_after[i] - theta3_pre[i]
-            for j in range(3):
-                s3_pre[i][j] = s3_after[i][j]
-                s3_after[i][j] = rayFrom3[i][j]
-            pos3 = s3_after[i] - s3_pre[i]
-            s3 = math.sqrt((pos3[0] ** 2) + (pos3[1] ** 2))
-            t3_pre[i] = t3_after[i]
-            t3_after[i] = time.time()
-            t3 = t3_after[i] - t3_pre[i]
-            v3 = s3 / t3
-            yaw3_rate = theta3 / t3
+            # theta3_pre[i] = theta3_after[i]
+            # theta3_after[i] = yaw_3[i]
+            # theta3 = theta3_after[i] - theta3_pre[i]
+            # for j in range(3):
+            #     s3_pre[i][j] = s3_after[i][j]
+            #     s3_after[i][j] = rayFrom3[i][j]
+            # pos3 = s3_after[i] - s3_pre[i]
+            # s3 = math.sqrt((pos3[0] ** 2) + (pos3[1] ** 2))
+            # t3_pre[i] = t3_after[i]
+            # t3_after[i] = time.time()
+            # t3 = t3_after[i] - t3_pre[i]
+            # v3 = s3 / t3
+            # yaw3_rate = theta3 / t3
             p.addUserDebugLine(rayFrom3[i], rayTo3[i], rayColor)
             results3 = p.rayTest(rayFrom3[i], rayTo3[i])
-            # point_x = results3[0][3][0] - rayFrom3[i][0]
-            # point_y = results3[0][3][1] - rayFrom3[i][1]
+            point_x = results3[0][3][0] - rayFrom3[i][0]
+            point_y = results3[0][3][1] - rayFrom3[i][1]
+            point_z = results3[0][3][2] - rayFrom3[i][2]
+            rfid.append(point_x, point_y)
+            sd2 = np.array([ray_x1, ray_y1])
             # RFID.append(np.hstack((point_x, point_y)))
             # u.append(np.array([v3, yaw3_rate]).reshape(2, 1))
-
+            td2 = time.time()
+        # rfid = np.concatenate([point_x, point_y])
+        # u = calc_input1(sd1, sd2, yaw1, yaw2, td1, td2)
         p.removeAllUserDebugItems()
+        return rfid,
 
     def run(self):
         try:
