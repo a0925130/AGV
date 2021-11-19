@@ -61,7 +61,6 @@ n_landmark = 0
 
 class mir_with_ur:
     def __init__(self):
-        self.n_landmark = self.RFID.shape[0]
         self.particles = [Slam_function.Particle(n_landmark) for _ in range(Slam_function.N_PARTICLE)]
         # self.uv = np.zeros((2, 1))
         # self.uv = []
@@ -257,30 +256,30 @@ class mir_with_ur:
                 # point_x[:length]
                 # point_y[:length]
 
-                if Slam_function.show_animation:  # pragma: no cover
-                    plt.cla()
-                    # for stopping simulation with the esc key.
-                    plt.gcf().canvas.mpl_connect(
-                        'key_release_event',
-                        lambda event: [exit(0) if event.key == 'escape' else None])
-                    plt.plot(self.RFID[:, 0], self.RFID[:, 1], "*k")
-
-                    for iz in range(len(self.z[:, 0])):
-                        landmark_id = int(self.z[2, iz])
-                        plt.plot([self.xEst[0], self.RFID[landmark_id, 0]], [
-                            self.xEst[1], self.RFID[landmark_id, 1]], "-k")
-
-                    for i in range(Slam_function.N_PARTICLE):
-                        plt.plot(self.particles[i].x, self.particles[i].y, ".r")
-                        plt.plot(self.particles[i].lm[:, 0], self.particles[i].lm[:, 1], "xb")
-
-                    plt.plot(self.hxTrue[0, :], self.hxTrue[1, :], "-b")
-                    plt.plot(self.hxDR[0, :], self.hxDR[1, :], "-k")
-                    plt.plot(self.hxEst[0, :], self.hxEst[1, :], "-r")
-                    plt.plot(self.xEst[0], self.xEst[1], "xk")
-                    plt.axis("equal")
-                    plt.grid(True)
-                    plt.pause(0.001)
+                # if Slam_function.show_animation:  # pragma: no cover
+                #     plt.cla()
+                #     # for stopping simulation with the esc key.
+                #     plt.gcf().canvas.mpl_connect(
+                #         'key_release_event',
+                #         lambda event: [exit(0) if event.key == 'escape' else None])
+                #     plt.plot(self.RFID[:, 0], self.RFID[:, 1], "*k")
+                #
+                #     for iz in range(len(self.z[:, 0])):
+                #         landmark_id = int(self.z[2, iz])
+                #         plt.plot([self.xEst[0], self.RFID[landmark_id, 0]], [
+                #             self.xEst[1], self.RFID[landmark_id, 1]], "-k")
+                #
+                #     for i in range(Slam_function.N_PARTICLE):
+                #         plt.plot(self.particles[i].x, self.particles[i].y, ".r")
+                #         plt.plot(self.particles[i].lm[:, 0], self.particles[i].lm[:, 1], "xb")
+                #
+                #     plt.plot(self.hxTrue[0, :], self.hxTrue[1, :], "-b")
+                #     plt.plot(self.hxDR[0, :], self.hxDR[1, :], "-k")
+                #     plt.plot(self.hxEst[0, :], self.hxEst[1, :], "-r")
+                #     plt.plot(self.xEst[0], self.xEst[1], "xk")
+                #     plt.axis("equal")
+                #     plt.grid(True)
+                #     plt.pause(0.001)
                 do_laser.join()
                 do_camera.join()
         finally:
